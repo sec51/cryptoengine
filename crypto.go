@@ -322,8 +322,8 @@ func (engine *CryptoEngine) PublicKey() []byte {
 	return engine.publicKey[:]
 }
 
-// This method accepts the message as string, then encrypts it using a symmetric key
-func (engine *CryptoEngine) NewMessage(message string) (Message, error) {
+// This method accepts the message as byte slice, then encrypts it using a symmetric key
+func (engine *CryptoEngine) NewMessage(message []byte) (Message, error) {
 
 	m := Message{}
 
@@ -333,11 +333,10 @@ func (engine *CryptoEngine) NewMessage(message string) (Message, error) {
 		return m, err
 	}
 
-	messageBytes := []byte(message)
 	m.version = secretKeyVersion
 	m.nonce = nonce
 
-	encryptedData := secretbox.Seal(nil, messageBytes, &m.nonce, &engine.secretKey)
+	encryptedData := secretbox.Seal(nil, message, &m.nonce, &engine.secretKey)
 
 	// assign the encrypted data to the message
 	m.message = encryptedData
@@ -349,10 +348,10 @@ func (engine *CryptoEngine) NewMessage(message string) (Message, error) {
 
 }
 
-// This method accepts the message as string and the public key of the receiver of the messae,
+// This method accepts the message as byte slice and the public key of the receiver of the messae,
 // then encrypts it using the asymmetric key public key.
 // If the public key is not privisioned and does not have the required length of 32 bytes it raises an exception.
-func (engine *CryptoEngine) NewMessageToPubKey(message string, peerPublicKey []byte) (Message, error) {
+func (engine *CryptoEngine) NewMessageToPubKey(message []byte, peerPublicKey []byte) (Message, error) {
 
 	var peerPublicKey32 [keySize]byte
 

@@ -8,7 +8,7 @@ import (
 )
 
 func TestSecretKeyEncryption(t *testing.T) {
-	message := "The quick brown fox jumps over the lazy dog"
+	message := []byte("The quick brown fox jumps over the lazy dog")
 
 	enginePeer, err := InitCryptoEngine("Sec51")
 	if err != nil {
@@ -74,14 +74,14 @@ func TestSecretKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if decrypted != message {
+	if string(decrypted) != string(message) {
 		cleanUp()
 		t.Fatal("Public key encryption/decryption broken")
 	}
 }
 
 func TestPublicKeyEncryption(t *testing.T) {
-	message := "The quick brown fox jumps over the lazy dog"
+	message := []byte("The quick brown fox jumps over the lazy dog")
 
 	firstEngine, err := InitCryptoEngine("Sec51Peer1")
 	if err != nil {
@@ -147,7 +147,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if decrypted != message {
+	if string(decrypted) != string(message) {
 		cleanUp()
 		t.Fatal("Public key encryption/decryption broken")
 	}
