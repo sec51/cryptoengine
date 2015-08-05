@@ -22,7 +22,7 @@ func TestSecretKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tcp, err := engine.NewMessage(message)
+	tcp, err := engine.NewEncryptedMessage(message)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tcp, err := firstEngine.NewMessageToPubKey(message, secondEngine.PublicKey())
+	tcp, err := firstEngine.NewEncryptedMessageWithPubKey(message, secondEngine.PublicKey())
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)

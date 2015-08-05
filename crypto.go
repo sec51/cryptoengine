@@ -323,7 +323,7 @@ func (engine *CryptoEngine) PublicKey() []byte {
 }
 
 // This method accepts the message as byte slice, then encrypts it using a symmetric key
-func (engine *CryptoEngine) NewMessage(message []byte) (Message, error) {
+func (engine *CryptoEngine) NewEncryptedMessage(message []byte) (Message, error) {
 
 	m := Message{}
 
@@ -351,7 +351,7 @@ func (engine *CryptoEngine) NewMessage(message []byte) (Message, error) {
 // This method accepts the message as byte slice and the public key of the receiver of the messae,
 // then encrypts it using the asymmetric key public key.
 // If the public key is not privisioned and does not have the required length of 32 bytes it raises an exception.
-func (engine *CryptoEngine) NewMessageToPubKey(message []byte, peerPublicKey []byte) (Message, error) {
+func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPublicKey []byte) (Message, error) {
 
 	var peerPublicKey32 [keySize]byte
 
