@@ -408,26 +408,26 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 
 }
 
-func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) (string, error) {
+func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) ([]byte, error) {
 
 	// decrypt with secretbox
 	if m.version == secretKeyVersion {
 
 		if decryptedMessage, valid := secretbox.Open(nil, m.message, &m.nonce, &engine.secretKey); !valid {
-			return "", MessageDecryptionError
+			return nil, MessageDecryptionError
 		} else {
-			return string(decryptedMessage), nil
+			return decryptedMessage, nil
 		}
 	}
 
 	// check that the  otherPeerPublicKey is set at this point
 	if otherPeerPublicKey == nil {
-		return "", KeyNotValidError
+		return nil, KeyNotValidError
 	}
 
 	// copy the key
 	if total := copy(engine.peerPublicKey[:], otherPeerPublicKey[:keySize]); total != keySize {
-		return "", KeyNotValidError
+		return nil, KeyNotValidError
 	}
 
 	if engine.preSharedInitialized {
@@ -441,11 +441,11 @@ func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) (strin
 
 }
 
-func decryptWithPreShared(engine *CryptoEngine, m Message) (string, error) {
+func decryptWithPreShared(engine *CryptoEngine, m Message) ([]byte, error) {
 	if decryptedMessage, valid := box.OpenAfterPrecomputation(nil, m.message, &m.nonce, &engine.sharedKey); !valid {
-		return "", MessageDecryptionError
+		return nil, MessageDecryptionError
 	} else {
-		return string(decryptedMessage), nil
+		return decryptedMessage, nil
 	}
 }
 
