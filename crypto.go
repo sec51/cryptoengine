@@ -483,7 +483,7 @@ func MessageFromBytes(data []byte) (Message, error) {
 	var versionData [4]byte
 	var lengthData [8]byte
 	var nonceData [nonceSize]byte
-	minimumDataSize := 8 + 4 + nonceSize + 1
+	minimumDataSize := 8 + 4 + nonceSize
 	m := Message{}
 
 	// check if the data is smaller than 36 which is the minimum
@@ -491,7 +491,7 @@ func MessageFromBytes(data []byte) (Message, error) {
 		return m, MessageParsingError
 	}
 
-	if len(data) < minimumDataSize {
+	if len(data) < minimumDataSize+1 {
 		return m, MessageParsingError
 	}
 

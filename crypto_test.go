@@ -176,5 +176,5 @@ func TestSanitization(t *testing.T) {
 }
 
 func cleanUp() {
-	removeFolder(keyPath)
+	//removeFolder(keyPath)
 }
