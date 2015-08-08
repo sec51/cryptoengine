@@ -34,6 +34,9 @@ func TestSecretKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// temporary write the corpus for fuzzing
+	// writeFile("corpus/4", messageBytes)
+
 	// simulate writing to network
 	var buffer bytes.Buffer
 	buffer.Write(messageBytes)
@@ -106,6 +109,9 @@ func TestPublicKeyEncryption(t *testing.T) {
 		cleanUp()
 		t.Fatal(err)
 	}
+
+	// temporary write the corpus for fuzzing
+	// writeFile("corpus/5", messageBytes)
 
 	// simulate writing to network
 	var buffer bytes.Buffer

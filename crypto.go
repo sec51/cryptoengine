@@ -479,22 +479,28 @@ func (m Message) ToBytes() ([]byte, error) {
 
 func MessageFromBytes(data []byte) (Message, error) {
 
+	var err error
 	var versionData [4]byte
 	var lengthData [8]byte
 	var nonceData [nonceSize]byte
-
+	minimumDataSize := 8 + 4 + nonceSize + 1
 	m := Message{}
-	lenght := data[:8]
-	version := data[8:12]
-	nonce := data[12:36]
-	message := data[36:]
 
-	total := copy(nonceData[:], nonce)
-	if total != nonceSize {
+	// check if the data is smaller than 36 which is the minimum
+	if data == nil {
 		return m, MessageParsingError
 	}
 
-	total = copy(lengthData[:], lenght)
+	if len(data) < minimumDataSize {
+		return m, MessageParsingError
+	}
+
+	lenght := data[:8]
+	version := data[8:12]
+	nonce := data[12 : 12+nonceSize] // 24 bytes
+	message := data[minimumDataSize:]
+
+	total := copy(lengthData[:], lenght)
 	if total != 8 {
 		return m, MessageParsingError
 	}
@@ -504,9 +510,14 @@ func MessageFromBytes(data []byte) (Message, error) {
 		return m, MessageParsingError
 	}
 
+	total = copy(nonceData[:], nonce)
+	if total != nonceSize {
+		return m, MessageParsingError
+	}
+
 	m.length = bigendian.FromUint64(lengthData)
 	m.version = bigendian.FromInt(versionData)
 	m.nonce = nonceData
 	m.message = message
-	return m, nil
+	return m, err
 }
