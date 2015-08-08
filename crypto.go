@@ -30,6 +30,7 @@ var (
 	KeyGenerationError     = errors.New("Could not generate random key")
 	MessageDecryptionError = errors.New("Could not verify the message. Message has been tempered with!")
 	MessageParsingError    = errors.New("Could not parse the Message from bytes")
+	messageEmpty           = errors.New("Can not encrypt an empty message")
 	whiteSpaceRegEx        = regexp.MustCompile("\\s")
 	emptyKey               = make([]byte, keySize)
 
@@ -327,6 +328,16 @@ func (engine *CryptoEngine) NewEncryptedMessage(message []byte) (Message, error)
 
 	m := Message{}
 
+	// check if the messageis nil
+	if message == nil {
+		return m, messageEmpty
+	}
+
+	// check if the message length is greather than zero
+	if len(message) == 0 {
+		return m, messageEmpty
+	}
+
 	// derive nonce
 	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
 	if err != nil {
@@ -356,6 +367,16 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 	var peerPublicKey32 [keySize]byte
 
 	m := Message{}
+
+	// check if the messageis nil
+	if message == nil {
+		return m, messageEmpty
+	}
+
+	// check if the message length is greather than zero
+	if len(message) == 0 {
+		return m, messageEmpty
+	}
 
 	// // check if the public key was set
 	if peerPublicKey == nil {
@@ -387,7 +408,6 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 		return m, err
 	}
 
-	messageBytes := []byte(message)
 	m.version = publicKeyVersion
 	m.nonce = nonce
 
@@ -396,7 +416,7 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 		box.Precompute(&engine.sharedKey, &engine.peerPublicKey, &engine.privateKey)
 		engine.preSharedInitialized = true
 	}
-	encryptedData := box.Seal(nil, messageBytes, &m.nonce, &engine.peerPublicKey, &engine.privateKey)
+	encryptedData := box.Seal(nil, message, &m.nonce, &engine.peerPublicKey, &engine.privateKey)
 
 	// assign the encrypted data to the message
 	m.message = encryptedData
@@ -422,6 +442,11 @@ func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) ([]byt
 
 	// check that the  otherPeerPublicKey is set at this point
 	if otherPeerPublicKey == nil {
+		return nil, KeyNotValidError
+	}
+
+	// Make sure the key has a valid size
+	if len(otherPeerPublicKey) < keySize {
 		return nil, KeyNotValidError
 	}
 
