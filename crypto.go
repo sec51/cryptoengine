@@ -5,22 +5,21 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/sec51/convert/bigendian"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/nacl/secretbox"
 	"log"
-	"math"
 	"net/url"
 	"regexp"
 	"strings"
 )
 
 const (
-	secretKeyVersion    = 0  // this is the symmetric encryption version
-	publicKeyVersion    = 1  // this is the asymmetric encryption version
+	// secretKeyVersion    = 0  // this is the symmetric encryption version
+	// publicKeyVersion    = 1  // this is the asymmetric encryption version
 	nonceSize           = 24 // this is the nonce size, required by NaCl
 	keySize             = 32 // this is the nonce size, required by NaCl
 	rotateSaltAfterDays = 2  // this is the amount of days the salt is valid - if it crosses this amount a new salt is generated
+	tcpVersion          = 0  // this is the current TCP version
 )
 
 var (
@@ -302,41 +301,15 @@ func sanitizeIdentifier(id string) string {
 	return cleaned
 }
 
-// load or generate the salt
-
-// This struct encapsulate the ecnrypted message in a TCP packet, in an easily parseable format
-// We assume the data is always encrypted
-// Format:
-// |lenght| => 8 bytes (uint64 total message length)
-// |version| => 4 bytes (int message version)
-// |nonce| => 24 bytes ([]byte size)
-// |message| => N bytes ([]byte message)
-type Message struct {
-	length  uint64          // total length of the packet
-	version int             // version of the message, done to support backward compatibility
-	nonce   [nonceSize]byte // the randomly created nonce. The nonce can be public.
-	message []byte          // the encrypted message
-}
-
 // Gives access to the public key
 func (engine *CryptoEngine) PublicKey() []byte {
 	return engine.publicKey[:]
 }
 
-// This method accepts the message as byte slice, then encrypts it using a symmetric key
-func (engine *CryptoEngine) NewEncryptedMessage(message []byte) (Message, error) {
+// This method accepts a message , then encrypts its Version+Type+Text using a symmetric key
+func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, error) {
 
-	m := Message{}
-
-	// check if the messageis nil
-	if message == nil {
-		return m, messageEmpty
-	}
-
-	// check if the message length is greather than zero
-	if len(message) == 0 {
-		return m, messageEmpty
-	}
+	m := EncryptedMessage{}
 
 	// derive nonce
 	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
@@ -344,16 +317,15 @@ func (engine *CryptoEngine) NewEncryptedMessage(message []byte) (Message, error)
 		return m, err
 	}
 
-	m.version = secretKeyVersion
 	m.nonce = nonce
 
-	encryptedData := secretbox.Seal(nil, message, &m.nonce, &engine.secretKey)
+	encryptedData := secretbox.Seal(nil, msg.toBytes(), &m.nonce, &engine.secretKey)
 
 	// assign the encrypted data to the message
-	m.message = encryptedData
+	m.data = encryptedData
 
 	// calculate the overall size of the message
-	m.length = uint64(len(m.message) + len(m.nonce) + 4 + 4)
+	m.length = uint64(len(m.data) + len(m.nonce))
 
 	return m, nil
 
@@ -362,21 +334,11 @@ func (engine *CryptoEngine) NewEncryptedMessage(message []byte) (Message, error)
 // This method accepts the message as byte slice and the public key of the receiver of the messae,
 // then encrypts it using the asymmetric key public key.
 // If the public key is not privisioned and does not have the required length of 32 bytes it raises an exception.
-func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPublicKey []byte) (Message, error) {
+func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, peerPublicKey []byte) (EncryptedMessage, error) {
 
 	var peerPublicKey32 [keySize]byte
 
-	m := Message{}
-
-	// check if the messageis nil
-	if message == nil {
-		return m, messageEmpty
-	}
-
-	// check if the message length is greather than zero
-	if len(message) == 0 {
-		return m, messageEmpty
-	}
+	m := EncryptedMessage{}
 
 	// // check if the public key was set
 	if peerPublicKey == nil {
@@ -408,7 +370,6 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 		return m, err
 	}
 
-	m.version = publicKeyVersion
 	m.nonce = nonce
 
 	// precompute the shared key, if it was not already
@@ -416,28 +377,52 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(message []byte, peerPu
 		box.Precompute(&engine.sharedKey, &engine.peerPublicKey, &engine.privateKey)
 		engine.preSharedInitialized = true
 	}
-	encryptedData := box.Seal(nil, message, &m.nonce, &engine.peerPublicKey, &engine.privateKey)
+	encryptedData := box.Seal(nil, msg.toBytes(), &m.nonce, &engine.peerPublicKey, &engine.privateKey)
 
 	// assign the encrypted data to the message
-	m.message = encryptedData
+	m.data = encryptedData
 
 	// calculate the size of the message
-	m.length = uint64(len(m.message))
+	m.length = uint64(len(m.data) + len(m.nonce))
 
 	return m, nil
 
 }
 
-func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) ([]byte, error) {
+// This method is used to decrypt messages where symmetrci encryption is used
+func (engine *CryptoEngine) Decrypt(encryptedBytes []byte) (*message, error) {
 
-	// decrypt with secretbox
-	if m.version == secretKeyVersion {
+	var err error
+	msg := new(message)
 
-		if decryptedMessage, valid := secretbox.Open(nil, m.message, &m.nonce, &engine.secretKey); !valid {
-			return nil, MessageDecryptionError
-		} else {
-			return decryptedMessage, nil
-		}
+	// convert the bytes to an encrypted message
+	encryptedMessage, err := encryptedMessageFromBytes(encryptedBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedMessageBytes, valid := secretbox.Open(nil, encryptedMessage.data, &encryptedMessage.nonce, &engine.secretKey)
+
+	// if the verification failed
+	if !valid {
+		return nil, MessageDecryptionError
+	}
+
+	// means we successfully managed to decrypt
+	msg, err = messageFromBytes(decryptedMessageBytes)
+	return msg, nil
+
+}
+
+// This method is used to decrypt messages where symmetrci encryption is used
+func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes, otherPeerPublicKey []byte) (*message, error) {
+
+	var err error
+
+	// convert the bytes to an encrypted message
+	encryptedMessage, err := encryptedMessageFromBytes(encryptedBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	// check that the  otherPeerPublicKey is set at this point
@@ -455,94 +440,33 @@ func (engine *CryptoEngine) Decrypt(m Message, otherPeerPublicKey []byte) ([]byt
 		return nil, KeyNotValidError
 	}
 
+	// Decrypt with the pre-initialized key
 	if engine.preSharedInitialized {
-		return decryptWithPreShared(engine, m)
+		messageBytes, err := decryptWithPreShared(engine, encryptedMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		return messageFromBytes(messageBytes)
 	}
 
+	// pre-compute the key and decrypt
 	box.Precompute(&engine.sharedKey, &engine.peerPublicKey, &engine.privateKey)
 	engine.preSharedInitialized = true
 
-	return decryptWithPreShared(engine, m)
+	messageBytes, err := decryptWithPreShared(engine, encryptedMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	return messageFromBytes(messageBytes)
 
 }
 
-func decryptWithPreShared(engine *CryptoEngine, m Message) ([]byte, error) {
-	if decryptedMessage, valid := box.OpenAfterPrecomputation(nil, m.message, &m.nonce, &engine.sharedKey); !valid {
+func decryptWithPreShared(engine *CryptoEngine, m EncryptedMessage) ([]byte, error) {
+	if decryptedMessage, valid := box.OpenAfterPrecomputation(nil, m.data, &m.nonce, &engine.sharedKey); !valid {
 		return nil, MessageDecryptionError
 	} else {
 		return decryptedMessage, nil
 	}
-}
-
-// STRUCTURE
-//    8		1	  24	  N
-// |SIZE|VERSION|NONCE|  DATA  |
-func (m Message) ToBytes() ([]byte, error) {
-	if m.length > math.MaxUint64 {
-		return nil, errors.New("The message exceeds the maximum allowed sized: uint64 MAX")
-	}
-
-	var buffer bytes.Buffer
-
-	// length
-	lengthBytes := bigendian.ToUint64(m.length)
-	buffer.Write(lengthBytes[:])
-
-	// version
-	versionBytes := bigendian.ToInt(m.version)
-	buffer.Write(versionBytes[:])
-
-	// nonce
-	buffer.Write(m.nonce[:])
-
-	// message
-	buffer.Write(m.message)
-
-	return buffer.Bytes(), nil
-
-}
-
-func MessageFromBytes(data []byte) (Message, error) {
-
-	var err error
-	var versionData [4]byte
-	var lengthData [8]byte
-	var nonceData [nonceSize]byte
-	minimumDataSize := 8 + 4 + nonceSize
-	m := Message{}
-
-	// check if the data is smaller than 36 which is the minimum
-	if data == nil {
-		return m, MessageParsingError
-	}
-
-	if len(data) < minimumDataSize+1 {
-		return m, MessageParsingError
-	}
-
-	lenght := data[:8]
-	version := data[8:12]
-	nonce := data[12 : 12+nonceSize] // 24 bytes
-	message := data[minimumDataSize:]
-
-	total := copy(lengthData[:], lenght)
-	if total != 8 {
-		return m, MessageParsingError
-	}
-
-	total = copy(versionData[:], version)
-	if total != 4 {
-		return m, MessageParsingError
-	}
-
-	total = copy(nonceData[:], nonce)
-	if total != nonceSize {
-		return m, MessageParsingError
-	}
-
-	m.length = bigendian.FromUint64(lengthData)
-	m.version = bigendian.FromInt(versionData)
-	m.nonce = nonceData
-	m.message = message
-	return m, err
 }

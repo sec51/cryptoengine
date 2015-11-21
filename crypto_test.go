@@ -8,7 +8,11 @@ import (
 )
 
 func TestSecretKeyEncryption(t *testing.T) {
-	message := []byte("The quick brown fox jumps over the lazy dog")
+
+	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	enginePeer, err := InitCryptoEngine("Sec51")
 	if err != nil {
@@ -22,13 +26,13 @@ func TestSecretKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tcp, err := engine.NewEncryptedMessage(message)
+	encryptedMessage, err := engine.NewEncryptedMessage(message)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	messageBytes, err := tcp.ToBytes()
+	messageBytes, err := encryptedMessage.ToBytes()
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
@@ -49,42 +53,52 @@ func TestSecretKeyEncryption(t *testing.T) {
 	}
 
 	// parse the bytes
-	storedMessage, err := MessageFromBytes(storedData)
+	storedMessage, err := encryptedMessageFromBytes(storedData)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	if storedMessage.version != tcp.version {
-		t.Error("Message version mismacth")
+	// check the encrypted message data if it matches
+	if storedMessage.length != encryptedMessage.length {
+		t.Error("Encrypted Message length mismacth")
 	}
 
-	if storedMessage.length != tcp.length {
-		t.Error("Message length mismacth")
+	if bytes.Compare(storedMessage.nonce[:], encryptedMessage.nonce[:]) != 0 {
+		t.Error("Encrypted  Message nonce mismacth")
 	}
 
-	if bytes.Compare(storedMessage.nonce[:], tcp.nonce[:]) != 0 {
-		t.Error("Message nonce mismacth")
+	if bytes.Compare(storedMessage.data[:], encryptedMessage.data[:]) != 0 {
+		t.Error("Encrypted Message data mismacth")
 	}
 
-	if bytes.Compare(storedMessage.message[:], tcp.message[:]) != 0 {
-		t.Error("Message nonce mismacth")
-	}
-
-	decrypted, err := enginePeer.Decrypt(storedMessage, nil)
+	decrypted, err := enginePeer.Decrypt(messageBytes)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	if string(decrypted) != string(message) {
+	if decrypted.Type != message.Type {
 		cleanUp()
-		t.Fatal("Public key encryption/decryption broken")
+		t.Fatal("Secret key encryption/decryption broken")
+	}
+
+	if decrypted.Version != message.Version {
+		cleanUp()
+		t.Fatal("Secret key encryption/decryption broken")
+	}
+
+	if decrypted.Text != message.Text {
+		cleanUp()
+		t.Fatal("Secret key encryption/decryption broken")
 	}
 }
 
 func TestPublicKeyEncryption(t *testing.T) {
-	message := []byte("The quick brown fox jumps over the lazy dog")
+	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	firstEngine, err := InitCryptoEngine("Sec51Peer1")
 	if err != nil {
@@ -98,13 +112,13 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tcp, err := firstEngine.NewEncryptedMessageWithPubKey(message, secondEngine.PublicKey())
+	encryptedMessage, err := firstEngine.NewEncryptedMessageWithPubKey(message, secondEngine.PublicKey())
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	messageBytes, err := tcp.ToBytes()
+	messageBytes, err := encryptedMessage.ToBytes()
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
@@ -125,35 +139,42 @@ func TestPublicKeyEncryption(t *testing.T) {
 	}
 
 	// parse the bytes
-	storedMessage, err := MessageFromBytes(storedData)
+	storedMessage, err := encryptedMessageFromBytes(storedData)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	if storedMessage.version != tcp.version && tcp.version != publicKeyVersion {
-		t.Error("Message version mismacth")
+	// check the encrypted message data if it matches
+	if storedMessage.length != encryptedMessage.length {
+		t.Error("Encrypted Message length mismacth")
 	}
 
-	if storedMessage.length != tcp.length {
-		t.Error("Message length mismacth")
+	if bytes.Compare(storedMessage.nonce[:], encryptedMessage.nonce[:]) != 0 {
+		t.Error("Encrypted  Message nonce mismacth")
 	}
 
-	if bytes.Compare(storedMessage.nonce[:], tcp.nonce[:]) != 0 {
-		t.Error("Message nonce mismacth")
+	if bytes.Compare(storedMessage.data[:], encryptedMessage.data[:]) != 0 {
+		t.Error("Encrypted Message data mismacth")
 	}
 
-	if bytes.Compare(storedMessage.message[:], tcp.message[:]) != 0 {
-		t.Error("Message nonce mismacth")
-	}
-
-	decrypted, err := secondEngine.Decrypt(storedMessage, firstEngine.PublicKey())
+	decrypted, err := secondEngine.DecryptWithPublicKey(messageBytes, firstEngine.PublicKey())
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
 
-	if string(decrypted) != string(message) {
+	if decrypted.Version != message.Version {
+		cleanUp()
+		t.Fatal("Public key encryption/decryption broken")
+	}
+
+	if decrypted.Type != message.Type {
+		cleanUp()
+		t.Fatal("Public key encryption/decryption broken")
+	}
+
+	if decrypted.Text != message.Text {
 		cleanUp()
 		t.Fatal("Public key encryption/decryption broken")
 	}

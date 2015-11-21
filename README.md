@@ -9,6 +9,16 @@ This simplifies even further the usage of the NaCl crypto primitives,
 by taking care of the `nonce` part.
 It uses a KDF, specifically HKDF to compute the nonces.
 
+### Big Picture
+
+The encryption and decryption phases are the following:
+
+```
+
+Message -> Encrypt -> EncryptedMessage ->  < = NETWORK = >  <- EncryptedMessage -> Descrypt -> Message
+
+```
+
 ### Usage
 
 1- Import the library
