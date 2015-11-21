@@ -105,14 +105,26 @@ func TestPublicKeyEncryption(t *testing.T) {
 		cleanUp()
 		t.Fatal(err)
 	}
+	// test the verification engine
+	firstVerificationEngine, err := NewVerificationEngine("Sec51Peer1")
+	if err != nil {
+		cleanUp()
+		t.Fatal(err)
+	}
 
 	secondEngine, err := InitCryptoEngine("Sec51Peer2")
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
 	}
+	// test the verification engine
+	secondVerificationEngine, err := NewVerificationEngineWithKey(secondEngine.PublicKey())
+	if err != nil {
+		cleanUp()
+		t.Fatal(err)
+	}
 
-	encryptedMessage, err := firstEngine.NewEncryptedMessageWithPubKey(message, secondEngine.PublicKey())
+	encryptedMessage, err := firstEngine.NewEncryptedMessageWithPubKey(message, secondVerificationEngine)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
@@ -158,7 +170,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Error("Encrypted Message data mismacth")
 	}
 
-	decrypted, err := secondEngine.DecryptWithPublicKey(messageBytes, firstEngine.PublicKey())
+	decrypted, err := secondEngine.DecryptWithPublicKey(messageBytes, firstVerificationEngine)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)

@@ -334,16 +334,14 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 // This method accepts the message as byte slice and the public key of the receiver of the messae,
 // then encrypts it using the asymmetric key public key.
 // If the public key is not privisioned and does not have the required length of 32 bytes it raises an exception.
-func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, peerPublicKey []byte) (EncryptedMessage, error) {
+func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificationEngine VerificationEngine) (EncryptedMessage, error) {
 
 	var peerPublicKey32 [keySize]byte
 
 	m := EncryptedMessage{}
 
-	// // check if the public key was set
-	if peerPublicKey == nil {
-		return m, KeyNotValidError
-	}
+	// get the peer public key
+	peerPublicKey := verificationEngine.PublicKey()
 
 	// check the size of the peerPublicKey
 	if len(peerPublicKey) != keySize {
@@ -415,9 +413,12 @@ func (engine *CryptoEngine) Decrypt(encryptedBytes []byte) (*message, error) {
 }
 
 // This method is used to decrypt messages where symmetrci encryption is used
-func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes, otherPeerPublicKey []byte) (*message, error) {
+func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes []byte, verificationEngine VerificationEngine) (*message, error) {
 
 	var err error
+
+	// get the peer public key
+	peerPublicKey := verificationEngine.PublicKey()
 
 	// convert the bytes to an encrypted message
 	encryptedMessage, err := encryptedMessageFromBytes(encryptedBytes)
@@ -425,18 +426,13 @@ func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes, otherPeerPublic
 		return nil, err
 	}
 
-	// check that the  otherPeerPublicKey is set at this point
-	if otherPeerPublicKey == nil {
-		return nil, KeyNotValidError
-	}
-
 	// Make sure the key has a valid size
-	if len(otherPeerPublicKey) < keySize {
+	if len(peerPublicKey) < keySize {
 		return nil, KeyNotValidError
 	}
 
 	// copy the key
-	if total := copy(engine.peerPublicKey[:], otherPeerPublicKey[:keySize]); total != keySize {
+	if total := copy(engine.peerPublicKey[:], peerPublicKey[:keySize]); total != keySize {
 		return nil, KeyNotValidError
 	}
 
