@@ -2,7 +2,7 @@ package cryptoengine
 
 import (
 	"bytes"
-	"fmt"
+
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -119,7 +119,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 	// test the verification engine
-	secondVerificationEngine, err := NewVerificationEngineWithKey(secondEngine.PublicKey())
+	secondVerificationEngine, err := NewVerificationEngine("Sec51Peer2")
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
@@ -172,8 +172,6 @@ func TestPublicKeyEncryption(t *testing.T) {
 	}
 
 	decrypted, err := secondEngine.DecryptWithPublicKey(storedData, firstVerificationEngine)
-
-	fmt.Printf("%s\n", decrypted)
 
 	if err != nil {
 		cleanUp()

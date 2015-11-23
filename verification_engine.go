@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+// The verification engine links two peers basically.
+// It holds the public key and the remote peer public key and the pre-shared key
 type VerificationEngine struct {
 	publicKey        [keySize]byte // the peer public key
 	signingPublicKey [keySize]byte // the peer public signing key => this is not implemented yet, because go does not support Ed25519 signatures yet
@@ -43,7 +45,7 @@ func NewVerificationEngine(context string) (VerificationEngine, error) {
 
 // This function instantiate the verification engine by passing it the key (at the moment only the public key)
 // go nacl crypto does not support Ed25519 signatures yet
-func NewVerificationEngineWithKey(publicKey []byte) (VerificationEngine, error) {
+func NewVerificationEngineWithKey(publicKey []byte, remotePeerPublicKey [keySize]byte) (VerificationEngine, error) {
 
 	engine := VerificationEngine{}
 	var data32 [keySize]byte
