@@ -2,6 +2,7 @@ package cryptoengine
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -9,7 +10,7 @@ import (
 
 func TestSecretKeyEncryption(t *testing.T) {
 
-	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 0)
+	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestSecretKeyEncryption(t *testing.T) {
 }
 
 func TestPublicKeyEncryption(t *testing.T) {
-	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 0)
+	message, err := NewMessage("The quick brown fox jumps over the lazy dog", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,6 +172,9 @@ func TestPublicKeyEncryption(t *testing.T) {
 	}
 
 	decrypted, err := secondEngine.DecryptWithPublicKey(storedData, firstVerificationEngine)
+
+	fmt.Printf("%s\n", decrypted)
+
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
