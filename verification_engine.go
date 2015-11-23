@@ -24,7 +24,7 @@ func NewVerificationEngine(context string) (VerificationEngine, error) {
 	}
 
 	// try to load the public key and if it succeed, then return both the keys
-	publicFile := fmt.Sprintf(publicKeySuffixFormat, context)
+	publicFile := fmt.Sprintf(publicKeySuffixFormat, sanitizeIdentifier(context))
 	// if the key exists
 	if keyFileExists(publicFile) {
 		// try to read it
@@ -45,7 +45,7 @@ func NewVerificationEngine(context string) (VerificationEngine, error) {
 
 // This function instantiate the verification engine by passing it the key (at the moment only the public key)
 // go nacl crypto does not support Ed25519 signatures yet
-func NewVerificationEngineWithKey(publicKey []byte, remotePeerPublicKey [keySize]byte) (VerificationEngine, error) {
+func NewVerificationEngineWithKey(publicKey []byte) (VerificationEngine, error) {
 
 	engine := VerificationEngine{}
 	var data32 [keySize]byte

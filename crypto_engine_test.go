@@ -119,7 +119,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 	// test the verification engine
-	secondVerificationEngine, err := NewVerificationEngine("Sec51Peer2")
+	secondVerificationEngine, err := NewVerificationEngineWithKey("Sec51Peer2")
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
