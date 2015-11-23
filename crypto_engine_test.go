@@ -170,7 +170,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 		t.Error("Encrypted Message data mismacth")
 	}
 
-	decrypted, err := secondEngine.DecryptWithPublicKey(messageBytes, firstVerificationEngine)
+	decrypted, err := secondEngine.DecryptWithPublicKey(storedData, firstVerificationEngine)
 	if err != nil {
 		cleanUp()
 		t.Fatal(err)
