@@ -345,11 +345,13 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 
 	// check the size of the peerPublicKey
 	if len(peerPublicKey) != keySize {
+		fmt.Printf("Public key size does not match requirements: got %d bytes\n", len(peerPublicKey))
 		return encryptedMessage, KeyNotValidError
 	}
 
 	// check the peerPublicKey is not empty (all zeros)
 	if bytes.Compare(peerPublicKey[:], emptyKey) == 0 {
+		fmt.Println("Public key is all zeroes")
 		return encryptedMessage, KeyNotValidError
 	}
 
