@@ -3,7 +3,7 @@ package cryptoengine
 import (
 	"bytes"
 	"errors"
-	"github.com/sec51/convert/smallendian"
+	"github.com/sec51/cryptoengine/Godeps/_workspace/src/github.com/sec51/convert/smallendian"
 	"math"
 )
 
