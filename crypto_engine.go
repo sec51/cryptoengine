@@ -9,8 +9,10 @@ import (
 	"github.com/sec51/cryptoengine/Godeps/_workspace/src/golang.org/x/crypto/nacl/box"
 	"github.com/sec51/cryptoengine/Godeps/_workspace/src/golang.org/x/crypto/nacl/secretbox"
 	"log"
+	"math"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -52,15 +54,16 @@ var (
 // The object has the methods necessary to execute all the needed functions to encrypt and decrypt a message, both with symmetric and asymmetric
 // crypto
 type CryptoEngine struct {
-	context    string        // this is the context used for the key derivation function and for namespacing the key files
-	publicKey  [keySize]byte // cached asymmetric public key
-	privateKey [keySize]byte // cached asymmetric private key
-	secretKey  [keySize]byte // secret key used for symmetric encryption
-	// sharedKey        [keySize]byte            // this is the precomputed key, between the peer aymmetric public key and the application asymmetric private key. This speeds up things.
+	context          string                   // this is the context used for the key derivation function and for namespacing the key files
+	publicKey        [keySize]byte            // cached asymmetric public key
+	privateKey       [keySize]byte            // cached asymmetric private key
+	secretKey        [keySize]byte            // secret key used for symmetric encryption
 	salt             [keySize]byte            // salt for deriving the random nonces
 	nonceKey         [keySize]byte            // this key is used for deriving the random nonces. It's different from the privateKey
 	mutex            sync.Mutex               // this mutex is used ti make sure that in case the engine is used by multiple thread the pre-shared key is correctly generated
 	preSharedKeysMap map[string][keySize]byte // this map holds the combination hash of peer public key as the map key and the preshared key as value used to encrypt
+	counter          uint64                   // this is the counter which is appended to the HKDF at each call
+	counterMutex     sync.Mutex               // this is the counter mutex for a safe incrementation (TODO: look into atomic)
 }
 
 // This function initialize all the necessary information to carry out a secure communication
@@ -303,6 +306,25 @@ func sanitizeIdentifier(id string) string {
 	return cleaned
 }
 
+func (engine *CryptoEngine) fetchAndIncrement() string {
+	engine.counterMutex.Lock()
+	defer engine.counterMutex.Unlock()
+
+	// first read the current value
+	// reset the counter
+	if engine.counter == math.MaxUint64 {
+		engine.counter = 0
+	}
+
+	// convert the counter to string
+	counterString := strconv.FormatUint(engine.counter, 10)
+
+	// increment the counter
+	engine.counter += 1
+
+	return counterString
+}
+
 // Gives access to the public key
 func (engine *CryptoEngine) PublicKey() []byte {
 	return engine.publicKey[:]
@@ -314,7 +336,7 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 	m := EncryptedMessage{}
 
 	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
+	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
 	if err != nil {
 		return m, err
 	}
@@ -354,7 +376,7 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 	}
 
 	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
+	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
 	if err != nil {
 		return encryptedMessage, err
 	}
