@@ -51,7 +51,7 @@ func (m message) toBytes() []byte {
 	versionBytes := smallendian.ToInt(m.Version)
 	buffer.Write(versionBytes[:])
 
-	// version
+	// type
 	typeBytes := smallendian.ToInt(m.Type)
 	buffer.Write(typeBytes[:])
 
@@ -143,7 +143,6 @@ func messageFromBytes(data []byte) (*message, error) {
 
 // STRUCTURE
 // 8  => |SIZE|
-// 1  => |VERSION|
 // 24 => |NONCE|
 // N  => |DATA|
 // |size| => 8 bytes (uint64 total message length)

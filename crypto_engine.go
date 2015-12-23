@@ -349,7 +349,7 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 	m.data = encryptedData
 
 	// calculate the overall size of the message
-	m.length = uint64(len(m.data) + len(m.nonce))
+	m.length = uint64(len(m.data) + len(m.nonce) + 8)
 
 	return m, nil
 
@@ -424,7 +424,7 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 	}
 
 	// calculate the size of the message
-	encryptedMessage.length = uint64(len(encryptedMessage.data) + len(encryptedMessage.nonce))
+	encryptedMessage.length = uint64(len(encryptedMessage.data) + len(encryptedMessage.nonce) + 8)
 
 	return encryptedMessage, nil
 
