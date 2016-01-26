@@ -6,8 +6,8 @@ go:
 sudo: required
 
 install:
-  - go get "golang.org/x/crypto/nacl/box"
-  - go get "golang.org/x/crypto/nacl/secretbox"
+  - go get "github.com/golang/crypto/nacl/box"
+  - go get "github.com/golang/crypto/nacl/secretbox"
   - go get "github.com/sec51/convert"
 
 script:
