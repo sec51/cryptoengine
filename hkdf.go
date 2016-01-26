@@ -3,7 +3,7 @@ package cryptoengine
 import (
 	"crypto/sha256"
 	"errors"
-	"github.com/golang/crypto/hkdf"
+	"golang.org/x/crypto/hkdf"
 	"io"
 )
 
