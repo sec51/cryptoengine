@@ -1,7 +1,7 @@
 package cryptoengine
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -73,9 +73,9 @@ func readKey(filename, pathFormat string) ([keySize]byte, error) {
 	if err != nil {
 		return data32, err
 	}
-	// decode from base64
+	// decode from hex
 	dst := make([]byte, len(data))
-	_, err = base64.StdEncoding.Decode(dst, data)
+	_, err = hex.Decode(dst, data) //.StdEncoding.Decode(dst, data)
 	if err != nil {
 		return data32, err
 	}
@@ -84,10 +84,10 @@ func readKey(filename, pathFormat string) ([keySize]byte, error) {
 	return data32, err
 }
 
-// Write the key file base64 encoded
+// Write the key file hex encoded
 func writeKey(filename, pathFormat string, data []byte) error {
-	dst := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-	base64.StdEncoding.Encode(dst, data)
+	dst := make([]byte, hex.EncodedLen(len(data))) //StdEncoding.EncodedLen(len(data)))
+	hex.Encode(dst, data)                          // StdEncoding.Encode(dst, data)
 	filePath := fmt.Sprintf(pathFormat, filename)
 	return writeFile(filePath, dst)
 }
