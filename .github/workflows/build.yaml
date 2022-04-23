@@ -1,0 +1,34 @@
+name: Cryptoengine
+
+on: [push, pull_request]
+
+jobs:  
+  build:
+    # OS
+    runs-on: self-hosted
+    # Steps: sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - name: Checkout
+      uses: actions/checkout@v3
+    
+    # Setup Go
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: '^1.18'
+    
+    # Prints the Golang version        
+    - run: go version
+
+    # Run build of the application
+    - name: Run build
+      run: go build -v ./...
+      
+    # Run vet & lint on the code
+    - name: Run vet & lint
+      run: go vet ./...
+    
+    # Run testing on the code
+    - name: Run testing
+      run: go test -cover ./...

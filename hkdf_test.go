@@ -2,7 +2,6 @@ package cryptoengine
 
 import (
 	"encoding/hex"
-	"strconv"
 	"testing"
 )
 
@@ -13,11 +12,11 @@ func TestHKDFDerivation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var previousKeys [100]string
+	var previousKeys [1024]string
 	var derivedKey [nonceSize]byte
 
-	for i := 0; i < 100; i++ {
-		derivedKey, err = deriveNonce(engine.nonceKey, engine.salt, engine.context, strconv.Itoa(i))
+	for i := 0; i < len(previousKeys); i++ {
+		derivedKey, err = deriveNonce(engine.nonceKey, engine.salt, engine.context, uint64(i))
 		if err != nil {
 			t.Fatal(err)
 		}

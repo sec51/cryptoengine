@@ -6,20 +6,21 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/nacl/box"
-	"golang.org/x/crypto/nacl/secretbox"
 	"log"
 	"math"
+	"math/big"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/crypto/nacl/box"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 const (
 	nonceSize           = 24 // this is the nonce size, required by NaCl
-	keySize             = 32 // this is the nonce size, required by NaCl
+	keySize             = 32 // this is the key size, required by NaCl
 	rotateSaltAfterDays = 7  // this is the amount of days the salt is valid - if it crosses this amount a new salt is generated
 	tcpVersion          = 0  // this is the current TCP version
 )
@@ -49,10 +50,10 @@ var (
 	nonceSuffixFormat = "%s_nonce.key" // this is the secret key crypto file used for generating nonces,for instance: sec51_nonce.key
 )
 
-// This is the basic object which needs to be instanciated for encrypting messages
-// either via public key cryptography or private key cryptography
-// The object has the methods necessary to execute all the needed functions to encrypt and decrypt a message, both with symmetric and asymmetric
-// crypto
+// This is the basic object which needs to be instantiated for encrypting messages,
+// either via public key cryptography or private key cryptography.
+// The object has the methods necessary to execute all the needed functions
+// to encrypt and decrypt a message, both with symmetric and asymmetric crypto
 type CryptoEngine struct {
 	context          string                   // this is the context used for the key derivation function and for namespacing the key files
 	publicKey        [keySize]byte            // cached asymmetric public key
@@ -60,10 +61,8 @@ type CryptoEngine struct {
 	secretKey        [keySize]byte            // secret key used for symmetric encryption
 	salt             [keySize]byte            // salt for deriving the random nonces
 	nonceKey         [keySize]byte            // this key is used for deriving the random nonces. It's different from the privateKey
-	mutex            sync.Mutex               // this mutex is used ti make sure that in case the engine is used by multiple thread the pre-shared key is correctly generated
+	mutex            sync.RWMutex             // this mutex is used to make sure that in case the engine is used by multiple thread the pre-shared key is correctly generated
 	preSharedKeysMap map[string][keySize]byte // this map holds the combination hash of peer public key as the map key and the preshared key as value used to encrypt
-	counter          uint64                   // this is the counter which is appended to the HKDF at each call
-	counterMutex     sync.Mutex               // this is the counter mutex for a safe incrementation (TODO: look into atomic)
 }
 
 // This function initialize all the necessary information to carry out a secure communication
@@ -76,7 +75,7 @@ type CryptoEngine struct {
 //   It, also, loads the already created keys back in memory based on the communicationIdentifier
 // - it does the same with the asymmetric keys
 // The communicationIdentifier parameter is URL unescape, trimmed, set to lower case and all the white spaces are replaced with an underscore.
-// The publicKey parameter can be nil. In that case the CryptoEngine assumes it has been instanciated for symmetric crypto usage.
+// The publicKey parameter can be nil. In that case the CryptoEngine assumes it has been instantiated for symmetric crypto usage.
 func InitCryptoEngine(communicationIdentifier string) (*CryptoEngine, error) {
 	// define an error object
 	var err error
@@ -119,6 +118,23 @@ func InitCryptoEngine(communicationIdentifier string) (*CryptoEngine, error) {
 	// finally return the CryptoEngine instance
 	return ce, nil
 
+}
+
+func newCryptoEngineWithKeys(context string, salt, public, private, secret, nonce [32]byte) (*CryptoEngine, error) {
+
+	// validate the context
+
+	// validate the keys
+
+	return &CryptoEngine{
+		context:          sanitizeIdentifier(context),
+		publicKey:        public,
+		privateKey:       private,
+		secretKey:        secret,
+		nonceKey:         nonce,
+		mutex:            sync.RWMutex{},
+		preSharedKeysMap: make(map[string][keySize]byte),
+	}, nil
 }
 
 // this function reads nonceSize random data
@@ -306,23 +322,17 @@ func sanitizeIdentifier(id string) string {
 	return cleaned
 }
 
-func (engine *CryptoEngine) fetchAndIncrement() string {
-	engine.counterMutex.Lock()
-	defer engine.counterMutex.Unlock()
+// Generates a random nonce, error in case there is not enough entropy
+func (engine *CryptoEngine) generateNonce() (uint64, error) {
 
-	// first read the current value
-	// reset the counter
-	if engine.counter == math.MaxUint64 {
-		engine.counter = 0
+	bigNonce, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		fmt.Println("Could not create nonce. Not enough entropy", err)
+		return 0, err
 	}
 
-	// convert the counter to string
-	counterString := strconv.FormatUint(engine.counter, 10)
+	return bigNonce.Uint64(), nil
 
-	// increment the counter
-	engine.counter += 1
-
-	return counterString
 }
 
 // Gives access to the public key
@@ -335,13 +345,20 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 
 	m := EncryptedMessage{}
 
-	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
+	// Generate a random nonce
+	nonce, err := engine.generateNonce()
 	if err != nil {
 		return m, err
 	}
 
-	m.nonce = nonce
+	// derive nonce
+	nonceBytes, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, nonce)
+	if err != nil {
+		return m, err
+	}
+
+	// Store the nonce in the message
+	m.nonce = nonceBytes
 
 	encryptedData := secretbox.Seal(nil, msg.toBytes(), &m.nonce, &engine.secretKey)
 
@@ -362,6 +379,12 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 
 	encryptedMessage := EncryptedMessage{}
 
+	// Generate a random nonce
+	nonce, err := engine.generateNonce()
+	if err != nil {
+		return encryptedMessage, err
+	}
+
 	// get the peer public key
 	peerPublicKey := verificationEngine.PublicKey()
 
@@ -376,27 +399,29 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 	}
 
 	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
+	nonceBytes, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, nonce)
 	if err != nil {
 		return encryptedMessage, err
 	}
 
 	// set the nonce to the encrypted message
-	encryptedMessage.nonce = nonce
+	encryptedMessage.nonce = nonceBytes
 
 	// calculate the hash of the peer public key
 	sha224String := fmt.Sprintf("%x", sha256.Sum224(peerPublicKey[:]))
 
-	// lock the mutex
-	engine.mutex.Lock()
-
+	// lock the mutex in read mode
+	engine.mutex.RLock()
 	// check if the pre sgared key is already present in the map
-	if preSharedKey, ok := engine.preSharedKeysMap[sha224String]; ok { // means the key is there
-		// unlock the mutex
-		engine.mutex.Unlock()
+	preSharedKey, ok := engine.preSharedKeysMap[sha224String]
+
+	// unlock the read mode
+	engine.mutex.RUnlock()
+
+	if ok { // means the key is there
 
 		// encrypt with the pre-computed key
-		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonce, &preSharedKey)
+		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonceBytes, &preSharedKey)
 
 		// assign the encrypted data to the message
 		encryptedMessage.data = encryptedData
@@ -410,6 +435,9 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 		// precompute the share key
 		box.Precompute(&preSharedKey, &peerPublicKey, &engine.privateKey)
 
+		// Lock the mutex in write mode
+		engine.mutex.Lock()
+
 		// assign it to the map
 		engine.preSharedKeysMap[sha224String] = preSharedKey
 
@@ -417,7 +445,7 @@ func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificat
 		engine.mutex.Unlock()
 
 		// encrypt with the pre-computed key
-		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonce, &preSharedKey)
+		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonceBytes, &preSharedKey)
 
 		// assign the encrypted data to the message
 		encryptedMessage.data = encryptedData
@@ -478,13 +506,15 @@ func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes []byte, verifica
 	sha224String := fmt.Sprintf("%x", sha256.Sum224(peerPublicKey[:]))
 
 	// lock the mutex
-	engine.mutex.Lock()
+	engine.mutex.RLock()
 
 	// check if the pre sgared key is already present in the map
-	if preSharedKey, ok := engine.preSharedKeysMap[sha224String]; ok { // means the key is there
-		// unlock the mutex
-		engine.mutex.Unlock()
+	preSharedKey, ok := engine.preSharedKeysMap[sha224String]
 
+	engine.mutex.RUnlock()
+
+	if ok {
+		// means the key is there
 		messageBytes, err := decryptWithPreShared(preSharedKey, encryptedMessage)
 		if err != nil {
 			return nil, err

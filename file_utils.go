@@ -21,8 +21,8 @@ var (
 
 // create the keys folder if it does not exist, with the proper permission
 func init() {
-	if os.Getenv("SEC51_KEYPATH") != "" {
-		keyPath = os.Getenv("SEC51_KEYPATH")
+	if os.Getenv("TOTP_KEYPATH") != "" {
+		keyPath = os.Getenv("TOTP_KEYPATH")
 	} else {
 		keyPath = "keys"
 	}

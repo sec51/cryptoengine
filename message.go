@@ -3,8 +3,9 @@ package cryptoengine
 import (
 	"bytes"
 	"errors"
-	"github.com/sec51/convert/smallendian"
 	"math"
+
+	"github.com/sec51/convert/smallendian"
 )
 
 // This struct encapsulate the ecnrypted message in a TCP packet, in an easily parseable format
@@ -27,6 +28,11 @@ type EncryptedMessage struct {
 	length uint64
 	nonce  [nonceSize]byte
 	data   []byte
+}
+
+// It's valid if it contains data
+func (em EncryptedMessage) IsValid() bool {
+	return len(em.data) > 0 && len(em.nonce) > 0 && em.length > 0
 }
 
 // Create a new message with a clear text and the message type

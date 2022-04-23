@@ -2,11 +2,28 @@ package cryptoengine
 
 import (
 	"bytes"
+	"math"
 
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestNonceGeneration(t *testing.T) {
+	engine, err := InitCryptoEngine("test")
+	assert.Nil(t, err)
+	assert.NotNil(t, engine)
+
+	nonce, err := engine.generateNonce()
+	assert.Nil(t, err)
+	assert.True(t, nonce > 0 && nonce < math.MaxUint64)
+
+	nonce, err = engine.generateNonce()
+	assert.Nil(t, err)
+	assert.True(t, nonce > 0 && nonce < math.MaxUint64)
+}
 
 func TestSecretKeyEncryption(t *testing.T) {
 
